@@ -1,0 +1,21 @@
+# Vivado project working directory (regenerate from sources)
+/vivado/
+
+# Vivado generated / runtime files
+*.jou
+*.log
+*.str
+*.pb
+*.wdb
+*.wcfg
+.Xil/
+*.cache/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+*.gen/
+
+# OS / editor
+.DS_Store
+*.swp
