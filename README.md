@@ -10,42 +10,58 @@ Parameterizable hardware arbiters in SystemVerilog for the Xilinx Basys3 (Artix-
 
 ## Features
 
-- Parameterizable `N`-input fixed-priority arbiter (`rtl/fixed_priority_arbiter.sv`), purely combinational.
-- Grant logic upholds the one-hot-or-zero invariant: at most one grant is ever asserted.
-- Self-checking testbench that flags any violation — multiple grants, or a grant to a non-requester.
-- Runs in Vivado's XSim simulator via the GUI or the command line.
+- Parameterizable `N`-input fixed-priority arbiter (`rtl/fixed_priority_arbiter.sv`) — purely combinational.
+- Parameterizable `N`-input round-robin arbiter (`rtl/round_robin_arbiter.sv`) — reuses the fixed-priority block twice around a one-hot pointer register; fair, no starvation.
+- One-hot-or-zero grant invariant on both designs, checked automatically in the testbenches.
+- Self-checking testbenches (combinational and clocked) running in Vivado XSim.
 
 ## Usage
 
+Fixed-priority (combinational):
+
 ```systemverilog
-fixed_priority_arbiter #(.N(4)) u_arb (
-    .req (req),   // input  [N-1:0] : requester i wants the resource
-    .gnt (gnt)    // output [N-1:0] : one-hot grant (or all zero)
+fixed_priority_arbiter #(.N(4)) u_fp (
+    .req (req),
+    .gnt (gnt)
 );
 ```
+
+Round-robin (clocked — needs a clock and an active-low reset):
+
+```systemverilog
+round_robin_arbiter #(.N(4)) u_rr (
+    .clk   (clk),
+    .rst_n (rst_n),
+    .req   (req),
+    .gnt   (gnt)
+);
+```
+
+## Simulation
+
+Fixed-priority — the grant follows the highest-priority active request; a busy high-priority line starves the ones below it:
+
+![Fixed-priority arbiter waveform](docs/images/fixed_priority_arbiter_waveform.png)
+
+Round-robin — under constant demand (`req = 1111`) the grant rotates `r0 → r1 → r2 → r3` and the pointer follows one step ahead, so no requester is starved:
+
+![Round-robin arbiter waveform](docs/images/round_robin_arbiter_waveform.png)
 
 ## Build & simulate
 
 **Vivado GUI**
-1. Add `rtl/` and `tb/` as design sources.
-2. Set `tb_fixed_priority_arbiter` as the simulation-set top module.
+1. Add `rtl/` as design sources and `tb/` as simulation sources.
+2. Set the testbench you want to run (`tb_fixed_priority_arbiter` or `tb_round_robin_arbiter`) as the simulation-set top.
 3. Flow Navigator -> Run Simulation -> Run Behavioral Simulation.
 
 **Command line (Vivado XSim)** — from a shell with Vivado on your `PATH`:
 
 ```bash
 cd sim
-./run_xsim.sh
+./run_xsim.sh tb_round_robin_arbiter   # or tb_fixed_priority_arbiter
 ```
 
-A clean run prints the request -> grant table with no `$error` lines.
-
-## Simulation
-
-![Fixed-priority arbiter waveform](docs/images/fixed_priority_arbiter_waveform.png)
-
-`req` drives the arbiter; `gnt` is the resulting one-hot grant. Note requester 3
-staying starved at t=70 ns while requester 0 keeps winning.
+A clean run prints the per-cycle grant table with no `$error` lines.
 
 ## Repository layout
 
@@ -69,7 +85,7 @@ docs/images/   waveform screenshots, diagrams
 
 ## Status
 
-Early / in progress — Phase 1 complete and simulating cleanly. No performance numbers yet; measured Fmax and bandwidth arrive in Phase 3.
+In progress — Phases 1–2 complete and simulating cleanly. Measured Fmax and bandwidth numbers arrive in Phase 3.
 
 ## License
 
