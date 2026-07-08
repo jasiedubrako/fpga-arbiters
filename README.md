@@ -40,6 +40,13 @@ cd sim
 
 A clean run prints the request -> grant table with no `$error` lines.
 
+## Simulation
+
+![Fixed-priority arbiter waveform](docs/images/fixed_priority_arbiter.png)
+
+`req` drives the arbiter; `gnt` is the resulting one-hot grant. Note requester 3
+staying starved at t=70 ns while requester 0 keeps winning.
+
 ## Repository layout
 
 ```
