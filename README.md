@@ -62,7 +62,7 @@ docs/images/   waveform screenshots, diagrams
 ## Roadmap
 
 - [x] Phase 1 — Fixed-priority arbiter + self-checking testbench
-- [ ] Phase 2 — Round-robin arbiter (fairness, no starvation)
+- [x] Phase 2 — Round-robin arbiter (fairness, no starvation)
 - [ ] Phase 3 — Datapath, bandwidth analysis, Vivado timing report (Fmax, critical path)
 - [ ] Phase 4 — Basys3 demo (clock divider, LEDs / 7-segment)
 - [ ] Phase 5 — Weighted round-robin, matrix arbiter, interview drills
