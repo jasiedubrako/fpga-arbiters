@@ -100,8 +100,17 @@ pointer-loop path. Both are valid "how fast can I clock this block" numbers, but
 the path structures differ; a perfectly clean comparison would wrap both the
 same way.
 
-## Next
-- **Optimization:** re-code the ripple cascade as a balanced **tree** (O(log N)
-  depth instead of O(N)) and re-measure — the logic-level count, and the Fmax
-  drop at large N, should shrink substantially. Same lesson as ripple-carry vs
-  carry-lookahead adders, proven with measured numbers.
+## Ripple vs tree cascade
+Re-coding the ripple prefix-OR as a **Kogge-Stone parallel-prefix tree**
+(O(log N) depth instead of O(N)) — and proving it functionally identical to the
+ripple with an exhaustive equivalence check — cuts the critical path at large N:
+
+| N = 32         | WNS (ns) | Min period (ns) | Fmax (MHz) | Logic levels |
+|----------------|----------|-----------------|------------|--------------|
+| Ripple cascade | 3.848    | 6.152           | 163        | 6            |
+| Tree cascade   | 5.440    | 4.560           | 219        | 3            |
+
+Halving the logic depth (6 → 3) raised Fmax ~34% (163 → 219 MHz) with no change
+in function. At N=4 the two are identical (both 1 LUT level) — the tree only
+pays off once the cascade is deep enough to matter. Same idea as carry-lookahead
+vs ripple-carry, proven with measured numbers.
