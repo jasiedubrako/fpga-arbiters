@@ -23,7 +23,7 @@ An arbiter grants a shared resource to exactly one of `N` competing requesters. 
 
 Switches assert requests; the granted LED rotates fairly among only the active requesters, twice per second. The 7-segment display shows the index currently being served.
 
-![Basys3 demo](docs/images/basys3_demo.mp4)
+![Basys3 demo](docs/images/basys3_demo.gif)
 
 ## Simulation
 
