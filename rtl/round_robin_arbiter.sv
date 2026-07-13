@@ -12,18 +12,23 @@
 //          priority search starts this cycle.
 //
 //   Invariant (unchanged from Phase 1): gnt is one-hot or all-zero.
+//
+// `en` = advance-enable. The pointer only moves when en is high (i.e.
+// when a grant is actually consumed). Tie en=1'b1 for free-running use;
+// drive it from a slow tick to rotate slowly for the hardware demo.
 //======================================================================
 module round_robin_arbiter #(
     parameter int N = 4
 ) (
     input  logic         clk,
     input  logic         rst_n,   // active-low synchronous reset
+    input  logic         en,      // advance pointer only when high
     input  logic [N-1:0] req,
     output logic [N-1:0] gnt
 );
 
-    // ---- the only stored state -------------------------------------
-    logic [N-1:0] pointer;        // one-hot: highest-priority position now
+    // one-hot pointer; powers up at index 0 so it is valid even before a reset
+    logic [N-1:0] pointer = {{(N-1){1'b0}}, 1'b1};
 
     // ---- start the search at the pointer ---------------------------
     // mask = ~(pointer - 1) is a thermometer of all bits >= pointer.
@@ -58,7 +63,7 @@ module round_robin_arbiter #(
     always_ff @(posedge clk) begin
         if (!rst_n)
             pointer <= {{(N-1){1'b0}}, 1'b1};  // reset: start at index 0
-        else if (|gnt)
+        else if (en && (|gnt))
             pointer <= next_pointer;           // advance only when a grant occurred
         // else: hold (idle cycle, nobody served)
     end

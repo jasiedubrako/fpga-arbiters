@@ -24,6 +24,7 @@ module tb_round_robin_arbiter;
     round_robin_arbiter #(.N(N)) dut (
         .clk   (clk),
         .rst_n (rst_n),
+        .en (1'b1),
         .req   (req),
         .gnt   (gnt)
     );

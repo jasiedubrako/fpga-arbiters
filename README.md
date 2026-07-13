@@ -1,112 +1,108 @@
 # fpga-arbiters
 
-Parameterizable hardware arbiters in SystemVerilog for the Xilinx Basys3 (Artix-7), working from a combinational fixed-priority design up to round-robin, with self-checking testbenches, real static-timing characterization, and an O(log N) prefix-tree optimization.
+Parameterizable hardware arbiters in SystemVerilog, with self-checking testbenches, characterized with static timing analysis and demonstrated live on a Xilinx Basys3 (Artix-7) FPGA.
 
 ![SystemVerilog](https://img.shields.io/badge/SystemVerilog-IEEE%201800-blue)
-![Tool](https://img.shields.io/badge/tool-Vivado-orange)
+![Tool](https://img.shields.io/badge/tool-Vivado%202023.1-orange)
 ![Board](https://img.shields.io/badge/board-Basys3%20Artix--7-green)
-![Status](https://img.shields.io/badge/status-in%20progress-yellow)
+![Status](https://img.shields.io/badge/status-complete-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+
+An arbiter grants a shared resource to exactly one of `N` competing requesters. It is the core of memory controllers, bus fabrics, NoC routers, and superscalar issue logic. This repo builds one from first principles: a combinational fixed-priority design, a starvation-free round-robin design, an O(log N) parallel-prefix optimization, and a working hardware demo.
 
 ## Features
 
-- Parameterizable `N`-input fixed-priority arbiter (`rtl/fixed_priority_arbiter.sv`) — purely combinational.
-- Parameterizable `N`-input round-robin arbiter (`rtl/round_robin_arbiter.sv`) — reuses the fixed-priority block twice around a one-hot pointer register; fair, no starvation.
-- Kogge-Stone parallel-prefix variant (`rtl/fixed_priority_arbiter_tree.sv`) — O(log N) depth, exhaustively equivalence-checked against the ripple version.
-- One-hot-or-zero grant invariant on all designs, checked automatically in the testbenches.
-- Self-checking testbenches (combinational and clocked) running in Vivado XSim.
-- Static timing analysis on Artix-7 — Fmax and bandwidth characterized across N.
+- **Fixed-priority arbiter** (`rtl/fixed_priority_arbiter.sv`): parameterizable, purely combinational, O(N) priority cascade.
+- **Round-robin arbiter** (`rtl/round_robin_arbiter.sv`): reuses the fixed-priority block twice around a one-hot rotating pointer. Fair, no starvation.
+- **Kogge-Stone prefix-tree variant** (`rtl/fixed_priority_arbiter_tree.sv`): O(log N) depth, exhaustively equivalence-checked against the ripple version.
+- **Self-checking testbenches**: every design enforces a one-hot-or-zero grant invariant automatically, in Vivado XSim.
+- **Timing characterized on real silicon**: Fmax, critical path, and bandwidth measured across N = 4 to 32.
+- **Live Basys3 demo**: slide switches drive requests, LEDs show the rotating grant, 7-segment shows the served requester.
 
-## Usage
+## Hardware demo
 
-Fixed-priority (combinational):
+Switches assert requests; the granted LED rotates fairly among only the active requesters, twice per second. The 7-segment display shows the index currently being served.
 
-```systemverilog
-fixed_priority_arbiter #(.N(4)) u_fp (
-    .req (req),
-    .gnt (gnt)
-);
-```
-
-Round-robin (clocked — needs a clock and an active-low reset):
-
-```systemverilog
-round_robin_arbiter #(.N(4)) u_rr (
-    .clk   (clk),
-    .rst_n (rst_n),
-    .req   (req),
-    .gnt   (gnt)
-);
-```
+![Basys3 demo](docs/images/basys3_demo.gif)
 
 ## Simulation
 
-Fixed-priority — the grant follows the highest-priority active request; a busy high-priority line starves the ones below it:
+Fixed-priority: the grant follows the highest-priority active request, so a busy high-priority line starves the ones below it.
 
-![Fixed-priority arbiter waveform](docs/images/fixed_priority_arbiter.png)
+![Fixed-priority waveform](docs/images/fixed_priority_arbiter.png)
 
-Round-robin — under constant demand (`req = 1111`) the grant rotates `r0 → r1 → r2 → r3` and the pointer follows one step ahead, so no requester is starved:
+Round-robin: under constant demand (`req = 1111`) the grant rotates `r0`, `r1`, `r2`, `r3`, with the pointer one step ahead. No requester is starved.
 
-![Round-robin arbiter waveform](docs/images/round_robin_arbiter.png)
+![Round-robin waveform](docs/images/round_robin_arbiter.png)
 
 ## Results
 
-Characterized on Artix-7 in Vivado by registering the I/O around the combinational arbiter and reading setup **WNS** against a 100 MHz constraint. `Fmax = 1000 / (10 − WNS)`. Full write-up: [docs/notes/03-timing-analysis.md](docs/notes/03-timing-analysis.md).
+Characterized on Artix-7 in Vivado by registering the I/O around the combinational arbiter and reading setup slack (WNS) against a 100 MHz constraint, where `Fmax = 1000 / (10 - WNS)`. Full write-up: [docs/notes/03-timing-analysis.md](docs/notes/03-timing-analysis.md).
 
 | N  | WNS (ns) | Min period (ns) | Fmax (MHz) | Logic levels |
 |----|----------|-----------------|------------|--------------|
 | 4  | 8.320    | 1.680           | 595        | 1            |
-| 8  | 7.531    | 2.469           | 405        | —            |
-| 16 | 7.199    | 2.801           | 357        | —            |
+| 8  | 7.531    | 2.469           | 405        | -            |
+| 16 | 7.199    | 2.801           | 357        | -            |
 | 32 | 3.848    | 6.152           | 163        | 6            |
 
 ![Fmax vs N](docs/images/fmax_vs_n.png)
 
-Fmax falls as N grows — the O(N) priority cascade lengthening the critical path. Re-coding the cascade as an **O(log N) Kogge-Stone prefix tree** (equivalence-checked) halves the depth at N=32 (6 → 3 logic levels) and raises Fmax from 163 MHz to **219 MHz (~34%)**. Bandwidth (1 grant/cycle × a 32-bit word) ranges from ~19.0 Gbit/s aggregate at N=4 down to ~5.2 Gbit/s at N=32.
+Fmax falls as N grows — the O(N) priority cascade lengthening the critical path.
 
-**Fairness cost (N=4):** round-robin raises the critical path from 1.68 ns to 3.04 ns, cutting Fmax from ~595 MHz to ~330 MHz (~45%). The extra delay is the mask + output mux that round-robin layers on the shared cascade — fixed priority is faster but starves; round-robin is fair but slower.
+**O(log N) optimization.** Re-coding the ripple cascade as a Kogge-Stone parallel-prefix tree halves the critical-path depth at N=32 (6 to 3 logic levels) and raises Fmax by 34%:
 
-## Build & simulate
+| N = 32         | Fmax (MHz) | Logic levels |
+|----------------|------------|--------------|
+| Ripple cascade | 163        | 6            |
+| Tree cascade   | **219**    | **3**        |
+
+**Cost of fairness (N=4).** Round-robin adds a mask and an output mux in series with the cascade, lengthening the critical path from 1.68 ns to 3.04 ns (595 MHz to 330 MHz). Fixed priority is faster but starves; round-robin is fair but slower.
+
+**Bandwidth.** At one grant per cycle over a 32-bit shared bus, aggregate throughput ranges from 19.0 Gbit/s (N=4) to 5.2 Gbit/s (N=32).
+
+## Build and simulate
 
 **Vivado GUI**
 1. Add `rtl/` as design sources and `tb/` as simulation sources.
-2. Set the testbench you want to run as the simulation-set top (e.g. `tb_round_robin_arbiter`, `tb_arbiter_equiv`).
-3. Flow Navigator -> Run Simulation -> Run Behavioral Simulation.
+2. Set the desired testbench as the simulation-set top (`tb_fixed_priority_arbiter`, `tb_round_robin_arbiter`, `tb_arbiter_equiv`, `tb_arbiter_top`).
+3. Flow Navigator > Run Simulation > Run Behavioral Simulation.
 
-**Command line (Vivado XSim)** — from a shell with Vivado on your `PATH`:
+**Command line (Vivado XSim)**, from a shell with Vivado on your `PATH`:
 
 ```bash
 cd sim
-./run_xsim.sh tb_round_robin_arbiter   # or tb_fixed_priority_arbiter, tb_arbiter_equiv
+./run_xsim.sh tb_round_robin_arbiter
 ```
 
 A clean run prints the per-cycle grant table with no `$error` lines.
 
+**Hardware (Basys3)**
+1. Set `arbiter_top` as the synthesis top.
+2. Use `constraints/basys3_demo.xdc` as the active constraint file (disable `basys3.xdc`, which is timing-only).
+3. Generate Bitstream, then Open Hardware Manager > Open Target > Auto Connect > Program Device.
+
 ## Repository layout
 
 ```
-rtl/           synthesizable design sources (+ timing harnesses)
-tb/            testbenches / verification
-constraints/   XDC pin & timing files
-sim/           simulation scripts (XSim batch)
-scripts/       project-generation Tcl (added later)
-docs/notes/    per-phase concept & analysis write-ups
-docs/images/   waveform screenshots, diagrams, plots
+rtl/           synthesizable sources (arbiters, tree variant, slow_tick, top, timing harnesses)
+tb/            self-checking testbenches
+constraints/   XDC pin and timing files
+sim/           XSim batch script
+docs/notes/    per-phase concept and analysis write-ups
+docs/images/   waveforms, plots, hardware demo
 ```
 
-## Roadmap
+## Documentation
 
-- [x] Phase 1 — Fixed-priority arbiter + self-checking testbench
-- [x] Phase 2 — Round-robin arbiter (fairness, no starvation)
-- [x] Phase 3 — Timing + bandwidth analysis, and an O(log N) Kogge-Stone tree cascade (6 → 3 logic levels, ~34% higher Fmax at N=32)
-- [ ] Phase 4 — Basys3 hardware demo (clock divider, live LEDs / 7-segment)
-
-Possible future extensions: weighted round-robin, matrix arbiter.
-
-## Status
-
-In progress. Phases 1–3 complete: fixed-priority and round-robin arbiters verified in simulation and characterized on Artix-7 via static timing analysis (fixed-priority Fmax ~595 MHz at N=4 to ~163 MHz at N=32; round-robin trades ~45% frequency for starvation-free fairness), plus a Kogge-Stone prefix-tree variant that restores ~34% of the Fmax lost to the O(N) cascade at N=32. Next: Phase 4 — a live demo on the Basys3 board.
+| Note | Topic |
+|------|-------|
+| [01](docs/notes/01-fixed-priority-arbiter.md) | Fixed priority, the one-hot invariant, starvation |
+| [02](docs/notes/02-round-robin-arbiter.md) | Round robin, the rotating pointer, fairness |
+| [03](docs/notes/03-timing-analysis.md) | Static timing analysis, Fmax, bandwidth, the prefix tree |
+| [04](docs/notes/04-hardware-demo.md) | Clock enables vs clock division, the Basys3 demo |
+| [SV vs Verilog](docs/notes/verilog-vs-systemverilog.md) | Side-by-side syntax reference |
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
